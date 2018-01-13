@@ -25,6 +25,8 @@ import (
 	"github.com/google/pprof/profile"
 )
 
+type HTTPServerArgs = plugin.HTTPServerArgs
+
 // PProf acquires a profile, and symbolizes it using a profile
 // manager. Then it generates a report formatted according to the
 // options selected through the flags package.
@@ -42,12 +44,14 @@ func (o *Options) internalOptions() *plugin.Options {
 		sym = &internalSymbolizer{o.Sym}
 	}
 	return &plugin.Options{
-		Writer:  o.Writer,
-		Flagset: o.Flagset,
-		Fetch:   o.Fetch,
-		Sym:     sym,
-		Obj:     obj,
-		UI:      o.UI,
+		Writer:      o.Writer,
+		Flagset:     o.Flagset,
+		Fetch:       o.Fetch,
+		Sym:         sym,
+		Obj:         obj,
+		UI:          o.UI,
+		HTTPServer:  o.HTTPServer,
+		WantBrowser: o.WantBrowser,
 	}
 }
 
@@ -59,6 +63,9 @@ type Options struct {
 	Sym     Symbolizer
 	Obj     ObjTool
 	UI      UI
+
+	HTTPServer  func(args *HTTPServerArgs) error
+	WantBrowser bool
 }
 
 // Writer provides a mechanism to write data under a certain name,
@@ -209,6 +216,10 @@ type UI interface {
 	// SetAutoComplete instructs the UI to call complete(cmd) to obtain
 	// the auto-completion of cmd, if the UI supports auto-completion at all.
 	SetAutoComplete(complete func(string) string)
+}
+
+type WebUI interface {
+	WebServer(*plugin.HTTPServerArgs) error
 }
 
 // internalObjTool is a wrapper to map from the pprof external

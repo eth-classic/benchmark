@@ -82,7 +82,7 @@ type webArgs struct {
 	FlameGraph template.JS
 }
 
-func serveWebInterface(hostport string, p *profile.Profile, o *plugin.Options, wantBrowser bool) error {
+func serveWebInterface(hostport string, p *profile.Profile, o *plugin.Options) error {
 	host, portStr, err := net.SplitHostPort(hostport)
 	if err != nil {
 		return fmt.Errorf("could not split http address: %v", err)
@@ -116,16 +116,18 @@ func serveWebInterface(hostport string, p *profile.Profile, o *plugin.Options, w
 		Host:     host,
 		Port:     port,
 		Handlers: map[string]http.Handler{
-			"/":           http.HandlerFunc(ui.dot),
+			"/dot":        http.HandlerFunc(ui.dot),
 			"/top":        http.HandlerFunc(ui.top),
 			"/disasm":     http.HandlerFunc(ui.disasm),
 			"/source":     http.HandlerFunc(ui.source),
 			"/peek":       http.HandlerFunc(ui.peek),
 			"/flamegraph": http.HandlerFunc(ui.flamegraph),
+			"/update":     http.HandlerFunc(ui.update),
+			"/":           http.HandlerFunc(ui.update),
 		},
 	}
 
-	if wantBrowser {
+	if o.WantBrowser {
 		go openBrowser("http://"+args.Hostport, o)
 	}
 	return server(args)
@@ -206,6 +208,9 @@ func varsFromURL(u *gourl.URL) variables {
 	vars["show"].value = u.Query().Get("s")
 	vars["ignore"].value = u.Query().Get("i")
 	vars["hide"].value = u.Query().Get("h")
+	if s := u.Query().Get("c"); s != "" {
+		vars["nodecount"].value = s
+	}
 	return vars
 }
 
@@ -278,7 +283,7 @@ func (ui *webInterface) dot(w http.ResponseWriter, req *http.Request) {
 		nodes = append(nodes, n.Info.Name)
 	}
 
-	ui.render(w, "/", "graph", rpt, errList, legend, webArgs{
+	ui.render(w, "/dot", "graph", rpt, errList, legend, webArgs{
 		HTMLBody: template.HTML(string(svg)),
 		Nodes:    nodes,
 	})
@@ -394,4 +399,20 @@ func getFromLegend(legend []string, param, def string) string {
 		}
 	}
 	return def
+}
+
+func (ui *webInterface) update(w http.ResponseWriter, req *http.Request) {
+	rpt, errList := ui.makeReport(w, req, []string{"top"}, "nodecount", "1")
+	if rpt == nil {
+		return // error already reported
+	}
+	_, legend := report.TextItems(rpt)
+	if p, _, err := ui.options.Fetch.Fetch("@", 0, 0); err != nil {
+		ui.render(w, "/", "plaintext", rpt, errList, legend, webArgs{
+			TextBody: err.Error(),
+		})
+	} else {
+		ui.prof = p
+		http.Redirect(w, req, "/dot?i=pprof%2Finternal%2Fdriver", 302)
+	}
 }

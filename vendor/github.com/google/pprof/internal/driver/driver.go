@@ -36,7 +36,6 @@ import (
 func PProf(eo *plugin.Options) error {
 	// Remove any temporary files created during pprof processing.
 	defer cleanupTempFiles()
-
 	o := setDefaults(eo)
 
 	src, cmd, err := parseFlags(o)
@@ -54,7 +53,7 @@ func PProf(eo *plugin.Options) error {
 	}
 
 	if src.HTTPHostport != "" {
-		return serveWebInterface(src.HTTPHostport, p, o, true)
+		return serveWebInterface(src.HTTPHostport, p, o)
 	}
 	return interactive(p, o)
 }
@@ -138,7 +137,7 @@ func generateReport(p *profile.Profile, cmd []string, vars variables, o *plugin.
 
 	// Output to specified file.
 	o.UI.PrintErr("Generating report in ", output)
-	out, err := os.Create(output)
+	out, err := o.Writer.Open(output)
 	if err != nil {
 		return err
 	}
